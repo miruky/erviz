@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <meta
+      name="description"
+      content="CREATE TABLE文を貼るだけでER図をSVGとして描き出すブラウザツール"
+    />
+    <link rel="icon" type="image/svg+xml" href="./logo.svg" />
+    <title>erviz - SQLからER図SVGを生成</title>
+  </head>
+  <body>
+    <div class="app">
+      <header class="hero">
+        <img src="./logo.svg" width="40" height="40" alt="" aria-hidden="true" />
+        <div>
+          <h1>erviz</h1>
+          <p class="lead">DDLを貼るとER図がSVGになる</p>
+        </div>
+        <a class="repo" href="https://github.com/miruky/erviz" target="_blank" rel="noreferrer"
+          >GitHub</a
+        >
+      </header>
+
+      <main class="panes">
+        <section class="editor" aria-label="DDL入力">
+          <div class="toolbar">
+            <button id="sample" type="button">サンプルを読み込む</button>
+            <span id="stats" class="stats" role="status"></span>
+          </div>
+          <textarea
+            id="ddl"
+            spellcheck="false"
+            aria-label="CREATE TABLE文を入力"
+            placeholder="CREATE TABLE文を貼り付ける"
+          ></textarea>
+          <ul id="warnings" class="warnings" aria-live="polite"></ul>
+        </section>
+
+        <section class="preview" aria-label="ER図プレビュー">
+          <div class="toolbar">
+            <button id="zoom-out" type="button" aria-label="縮小">&minus;</button>
+            <button id="zoom-in" type="button" aria-label="拡大">+</button>
+            <button id="zoom-fit" type="button">全体表示</button>
+            <span class="spacer"></span>
+            <button id="copy" type="button">SVGをコピー</button>
+            <button id="download" type="button" class="primary">SVGをダウンロード</button>
+            <span id="status" class="status" role="status"></span>
+          </div>
+          <div id="canvas" class="canvas" aria-label="ER図"></div>
+        </section>
+      </main>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
