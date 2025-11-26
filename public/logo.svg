@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="ervizのロゴ">
+  <title>erviz</title>
+  <style>
+    svg {
+      --ink: #28323a;
+      --accent: #0e7f74;
+      color: var(--ink);
+    }
+    @media (prefers-color-scheme: dark) {
+      svg { --ink: #dde3e8; --accent: #4fb8a8; }
+    }
+  </style>
+  <g fill="none" stroke="currentColor" stroke-width="6" stroke-linejoin="round">
+    <rect x="14" y="22" width="44" height="34" rx="7"/>
+    <path d="M14 36h44"/>
+    <rect x="70" y="72" width="44" height="34" rx="7"/>
+    <path d="M70 86h44"/>
+  </g>
+  <g fill="none" stroke="var(--accent)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M36 56v33h20"/>
+    <path d="M70 81 56 89M70 97 56 89"/>
+  </g>
+</svg>
