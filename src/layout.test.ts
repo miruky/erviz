@@ -93,4 +93,57 @@ describe('layoutSchema', () => {
     );
     expect(l.boxes).toHaveLength(1);
   });
+
+  it('既定は横向き(LR)で direction を返す', () => {
+    const l = layoutSchema(parseSchema('CREATE TABLE t (id INT PRIMARY KEY);'));
+    expect(l.direction).toBe('LR');
+  });
+});
+
+describe('layoutSchema: 縦向き(TB)', () => {
+  const ddl = `
+    CREATE TABLE users (id INT PRIMARY KEY);
+    CREATE TABLE orders (id INT PRIMARY KEY, user_id INT REFERENCES users(id));
+    CREATE TABLE order_items (order_id INT REFERENCES orders(id), n INT);
+  `;
+
+  it('参照される側を参照する側より上に置く', () => {
+    const l = layoutSchema(parseSchema(ddl), { direction: 'TB' });
+    expect(l.direction).toBe('TB');
+    const users = boxOf(l.boxes, 'users');
+    const orders = boxOf(l.boxes, 'orders');
+    const items = boxOf(l.boxes, 'order_items');
+    expect(users.y + users.height).toBeLessThan(orders.y);
+    expect(orders.y + orders.height).toBeLessThan(items.y);
+  });
+
+  it('縦向きでもボックスが重ならず境界に収まる', () => {
+    const l = layoutSchema(
+      parseSchema(`
+        CREATE TABLE a (id INT PRIMARY KEY);
+        CREATE TABLE b (id INT PRIMARY KEY, a_id INT REFERENCES a(id));
+        CREATE TABLE c (id INT PRIMARY KEY, a_id INT REFERENCES a(id));
+      `),
+      { direction: 'TB' },
+    );
+    for (let i = 0; i < l.boxes.length; i += 1) {
+      for (let j = i + 1; j < l.boxes.length; j += 1) {
+        const a = l.boxes[i];
+        const b = l.boxes[j];
+        if (a === undefined || b === undefined) continue;
+        expect(overlaps(a, b)).toBe(false);
+      }
+    }
+    for (const b of l.boxes) {
+      expect(b.x + b.width).toBeLessThanOrEqual(l.width);
+      expect(b.y + b.height).toBeLessThanOrEqual(l.height);
+    }
+  });
+
+  it('横向きと縦向きで縦横比が入れ替わる', () => {
+    const lr = layoutSchema(parseSchema(ddl), { direction: 'LR' });
+    const tb = layoutSchema(parseSchema(ddl), { direction: 'TB' });
+    expect(lr.width).toBeGreaterThan(lr.height);
+    expect(tb.height).toBeGreaterThan(tb.width);
+  });
 });
