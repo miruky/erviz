@@ -151,6 +151,31 @@ describe('parseSchema: リレーション', () => {
     expect(s.relations[0]?.toTable).toBe('categories');
   });
 
+  it('ON DELETE / ON UPDATE の参照アクションを読み取る', () => {
+    const s = parseSchema(`
+      CREATE TABLE users (id INT PRIMARY KEY);
+      CREATE TABLE orders (
+        id INT PRIMARY KEY,
+        user_id INT NOT NULL REFERENCES users(id) ON DELETE CASCADE ON UPDATE SET NULL
+      );
+    `);
+    expect(s.relations[0]?.onDelete).toBe('CASCADE');
+    expect(s.relations[0]?.onUpdate).toBe('SET NULL');
+  });
+
+  it('表制約・ALTERのFKでも参照アクションを拾い、無指定なら付かない', () => {
+    const s = parseSchema(`
+      CREATE TABLE a (id INT PRIMARY KEY);
+      CREATE TABLE b (id INT PRIMARY KEY, a_id INT);
+      CREATE TABLE c (id INT PRIMARY KEY, a_id INT, FOREIGN KEY (a_id) REFERENCES a(id) ON DELETE NO ACTION);
+      ALTER TABLE b ADD CONSTRAINT b_fk FOREIGN KEY (a_id) REFERENCES a(id) ON DELETE RESTRICT;
+    `);
+    const byFrom = (name: string) => s.relations.find((r) => r.fromTable === name);
+    expect(byFrom('c')?.onDelete).toBe('NO ACTION');
+    expect(byFrom('c')?.onUpdate).toBeUndefined();
+    expect(byFrom('b')?.onDelete).toBe('RESTRICT');
+  });
+
   it('同一のFKが重複しても1本にまとめる', () => {
     const s = parseSchema(`
       CREATE TABLE a (id INT PRIMARY KEY);
