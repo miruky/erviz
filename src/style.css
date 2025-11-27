@@ -184,7 +184,8 @@ kbd {
     color 0.2s var(--ease);
 }
 .nav a:hover,
-.nav a:focus-visible {
+.nav a:focus-visible,
+.nav a.active {
   color: var(--ink);
   background-size: 100% 1.5px;
 }
@@ -334,12 +335,35 @@ section {
   margin: 0;
 }
 .figure-stage {
+  position: relative;
   border: 1px solid var(--hair);
   border-radius: 14px;
   background: var(--surface);
   padding: 18px;
   overflow: hidden;
   box-shadow: 0 1px 0 var(--hair);
+}
+/* 製図風のコーナーティック */
+.figure-stage::before,
+.figure-stage::after {
+  content: '';
+  position: absolute;
+  width: 13px;
+  height: 13px;
+  opacity: 0.55;
+  pointer-events: none;
+}
+.figure-stage::before {
+  top: 8px;
+  left: 8px;
+  border-top: 1.5px solid var(--accent);
+  border-left: 1.5px solid var(--accent);
+}
+.figure-stage::after {
+  bottom: 8px;
+  right: 8px;
+  border-bottom: 1.5px solid var(--accent);
+  border-right: 1.5px solid var(--accent);
 }
 .figure-stage svg {
   display: block;
@@ -658,9 +682,24 @@ textarea:focus-visible {
   border: 1px solid var(--hair);
   border-radius: 14px;
   overflow: hidden;
+  counter-reset: ex;
 }
 .gallery li {
   background: var(--surface);
+  counter-increment: ex;
+}
+.thumb {
+  position: relative;
+}
+.thumb::after {
+  content: counter(ex, decimal-leading-zero);
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--muted);
 }
 .card {
   display: flex;
