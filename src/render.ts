@@ -220,7 +220,12 @@ function routeTB(from: Box, to: Box): Endpoints {
 
 function edgeSvg(rel: Relation, from: Box, to: Box, dir: Layout['direction']): string {
   const e = dir === 'TB' ? routeTB(from, to) : routeLR(rel, from, to);
-  const label = `${rel.fromTable}.${rel.fromColumns.join(',')} から ${rel.toTable}.${rel.toColumns.join(',')} への参照`;
+  const acts: string[] = [];
+  if (rel.onDelete !== undefined) acts.push(`ON DELETE ${rel.onDelete}`);
+  if (rel.onUpdate !== undefined) acts.push(`ON UPDATE ${rel.onUpdate}`);
+  const label =
+    `${rel.fromTable}.${rel.fromColumns.join(',')} から ${rel.toTable}.${rel.toColumns.join(',')} への参照` +
+    (acts.length > 0 ? `(${acts.join(', ')})` : '');
   return (
     `<g class="edge" data-from="${esc(rel.fromTable)}" data-to="${esc(rel.toTable)}"><title>${esc(label)}</title>` +
     `<path class="hit" d="${e.d}"/>` +

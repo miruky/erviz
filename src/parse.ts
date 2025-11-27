@@ -25,6 +25,10 @@ export interface Relation {
   one: boolean;
   /** 参照元の列がすべてNOT NULLなら必須参照 */
   mandatory: boolean;
+  /** ON DELETE の参照アクション(CASCADE など。未指定なら undefined) */
+  onDelete?: string;
+  /** ON UPDATE の参照アクション */
+  onUpdate?: string;
 }
 
 export interface Schema {
@@ -199,6 +203,47 @@ interface PendingFk {
   fromColumns: string[];
   toTable: string;
   toColumns: string[];
+  onDelete?: string;
+  onUpdate?: string;
+}
+
+interface RefActions {
+  onDelete?: string;
+  onUpdate?: string;
+  next: number;
+}
+
+/** `ON DELETE CASCADE` / `ON UPDATE SET NULL` などの参照アクションを読む */
+function readRefActions(toks: Tok[], start: number): RefActions {
+  let i = start;
+  let onDelete: string | undefined;
+  let onUpdate: string | undefined;
+  while (isWord(toks[i], 'ON')) {
+    const kind = toks[i + 1];
+    if (!isWord(kind, 'DELETE') && !isWord(kind, 'UPDATE')) break;
+    let j = i + 2;
+    const a = toks[j];
+    let action: string;
+    if (isWord(a, 'NO') && isWord(toks[j + 1], 'ACTION')) {
+      action = 'NO ACTION';
+      j += 2;
+    } else if (
+      isWord(a, 'SET') &&
+      (isWord(toks[j + 1], 'NULL') || isWord(toks[j + 1], 'DEFAULT'))
+    ) {
+      action = `SET ${toks[j + 1]?.upper}`;
+      j += 2;
+    } else if (a !== undefined && a.kind === 'word') {
+      action = a.upper;
+      j += 1;
+    } else {
+      break;
+    }
+    if (kind?.upper === 'DELETE') onDelete = action;
+    else onUpdate = action;
+    i = j;
+  }
+  return { onDelete, onUpdate, next: i };
 }
 
 interface PendingMark {
@@ -319,11 +364,14 @@ function parseTableEntry(item: Tok[], table: Table, ctx: ParseCtx): void {
         if (ref === null) return;
         j = ref.next;
         const refCols = readColumnList(item, j);
+        const acts = readRefActions(item, refCols === null ? j : refCols.next);
         ctx.fks.push({
           fromTable: table.name,
           fromColumns: list.cols,
           toTable: ref.name,
           toColumns: refCols === null ? [] : refCols.cols,
+          onDelete: acts.onDelete,
+          onUpdate: acts.onUpdate,
         });
         return;
       }
@@ -367,13 +415,17 @@ function parseTableEntry(item: Tok[], table: Table, ctx: ParseCtx): void {
       const ref = readQualifiedName(item, j + 1);
       if (ref === null) continue;
       const refCols = readColumnList(item, ref.next);
+      const after = refCols === null ? ref.next : refCols.next;
+      const acts = readRefActions(item, after);
       ctx.fks.push({
         fromTable: table.name,
         fromColumns: [col.name],
         toTable: ref.name,
         toColumns: refCols === null ? [] : refCols.cols,
+        onDelete: acts.onDelete,
+        onUpdate: acts.onUpdate,
       });
-      j = (refCols === null ? ref.next : refCols.next) - 1;
+      j = acts.next - 1;
     }
   }
   table.columns.push(col);
@@ -411,13 +463,16 @@ function parseAlterTable(stmt: Tok[], ctx: ParseCtx): void {
       if (ref === null) continue;
       k = ref.next;
       const refCols = readColumnList(stmt, k);
+      const acts = readRefActions(stmt, refCols === null ? k : refCols.next);
       ctx.fks.push({
         fromTable: tableName,
         fromColumns: list.cols,
         toTable: ref.name,
         toColumns: refCols === null ? [] : refCols.cols,
+        onDelete: acts.onDelete,
+        onUpdate: acts.onUpdate,
       });
-      j = (refCols === null ? k : refCols.next) - 1;
+      j = acts.next - 1;
     }
   }
 }
@@ -510,6 +565,8 @@ export function parseSchema(sql: string): Schema {
       toColumns,
       one,
       mandatory,
+      ...(fk.onDelete !== undefined ? { onDelete: fk.onDelete } : {}),
+      ...(fk.onUpdate !== undefined ? { onUpdate: fk.onUpdate } : {}),
     });
   }
 
