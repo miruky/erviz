@@ -25,17 +25,25 @@
 
 ## 技術スタック
 
-| 領域                 | 採用技術                       |
-| -------------------- | ------------------------------ |
-| 言語                 | TypeScript 5(strict、依存ゼロ) |
-| ビルド               | Vite                           |
-| テスト               | Vitest                         |
-| リンタ・フォーマッタ | ESLint + Prettier              |
-| CI / 配信            | GitHub Actions + GitHub Pages  |
+| 領域                 | 採用技術                      |
+| -------------------- | ----------------------------- |
+| 言語                 | TypeScript 5(strict)          |
+| ビルド               | Vite                          |
+| 解析・描画           | 自前実装(外部依存なし)        |
+| モーション           | GSAP + ScrollTrigger(UIのみ)  |
+| テスト               | Vitest                        |
+| リンタ・フォーマッタ | ESLint + Prettier             |
+| CI / 配信            | GitHub Actions + GitHub Pages |
+
+解析・レイアウト・描画(`parse.ts` / `layout.ts` / `render.ts`)は外部依存を持たない。GSAPはスタジオの出現アニメーションにのみ使い、生成されるSVG自体には含まれない。
 
 ## 使い方
 
-[公開ページ](https://miruky.github.io/erviz/)にDDLを貼ると、右ペインに図が出る。ドラッグでパン、ホイールで拡大縮小、ダブルクリックで全体表示に戻る。
+[公開ページ](https://miruky.github.io/erviz/)のスタジオにDDLを貼ると、右ペインに図が出る。ドラッグでパン、ホイールで拡大縮小、ダブルクリックで全体表示に戻る。テーブルにカーソルを合わせると、その関係だけが浮き上がる。
+
+入力内容はブラウザに保存され、次に開いたときに復元される。用意したスキーマ(ECサイト・ブログ・SaaS課金・組織図)はワンクリックで読み込める。図は横並び(参照先を左)と縦並び(参照先を上)を切り替えられ、SVG・PNGでの保存、SVGのクリップボードコピー、状態を載せた共有リンクの発行に対応する。表示はライト・ダーク・自動から選べ、選択はOSの設定と独立して保存される。
+
+主なキーボードショートカット: <kbd>Ctrl/Cmd</kbd>+<kbd>Enter</kbd> で全体表示、<kbd>Ctrl/Cmd</kbd>+<kbd>S</kbd> でSVG保存、<kbd>D</kbd> で並び方向の切替、<kbd>?</kbd> で一覧。
 
 ```sql
 CREATE TABLE users (
@@ -69,7 +77,12 @@ import { ddlToSvg } from './src';
 
 const svg = ddlToSvg('CREATE TABLE t (id INT PRIMARY KEY);');
 // "<svg id=\"er\" xmlns=... viewBox=\"0 0 224 98\" ...>...</svg>"
+
+// 縦並び(参照先を上)にする
+const vertical = ddlToSvg(sql, { direction: 'TB' });
 ```
+
+`parseSchema` / `layoutSchema` / `renderSvg` を個別に呼べば、解析結果の検査や独自レイアウトにも使える。
 
 制約も書いておく。ストアドプロシージャやトリガー本体のように文中にセミコロンを含む構文は分割を誤ることがある。`ALTER TABLE ... ADD COLUMN` のインライン `REFERENCES` は未対応。CHECK制約やインデックスは図に影響しないため無視する。
 
@@ -77,10 +90,13 @@ const svg = ddlToSvg('CREATE TABLE t (id INT PRIMARY KEY);');
 
 - `src/`
   - `parse.ts` — DDLの字句解析とテーブル・リレーション抽出
-  - `layout.ts` — FK依存に基づく層状の自動配置
+  - `layout.ts` — FK依存に基づく層状の自動配置(横並び・縦並び)
   - `render.ts` — クロウズフット記法のSVG文字列生成
-  - `sample.ts` — 初期表示用のサンプルスキーマ
-  - `main.ts` + `index.html` — エディタとパン・ズーム付きプレビュー
+  - `examples.ts` + `sample.ts` — そのまま試せるサンプルスキーマ集
+  - `theme.ts` — ライト・ダーク・自動の解決ロジック
+  - `share.ts` — DDLを共有リンクのハッシュに載せる符号化
+  - `png.ts` — SVGからPNGへのラスタライズ
+  - `main.ts` + `index.html` — スタジオ(エディタ・パン/ズーム・各種書き出し)
   - `index.ts` — ライブラリとしての公開面(`ddlToSvg` ほか)
 - `docs/` — アーキテクチャ図
 - `.github/workflows/` — CIとPagesデプロイ
@@ -108,6 +124,8 @@ npm run build   # 型チェック + ビルド
 **SVGは単体で配れる形にする。** 出力にはviewBoxとスタイルが埋め込まれ、特定のページに依存しない。リポジトリにコミットすればプレビューでき、prefers-color-schemeで閲覧側のテーマにも追従する。
 
 **レイアウトは決定的にする。** 乱数や物理シミュレーションを使わないため、同じDDLからは同じSVGができる。図をGit管理しても差分はスキーマの変更だけを映す。
+
+**動きは添えるが、強要しない。** スタジオには出現アニメーションやホバーの強調を入れているが、`prefers-reduced-motion: reduce` を指定した環境では一切動かさない。マーキーはホバーで止まり、図の操作はキーボードからも完結する。
 
 ## ライセンス
 
