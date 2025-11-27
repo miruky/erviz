@@ -1,58 +1,262 @@
 <!doctype html>
-<html lang="ja">
+<html lang="ja" data-theme="light">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
     <meta
       name="description"
-      content="CREATE TABLE文を貼るだけでER図をSVGとして描き出すブラウザツール"
+      content="SQLのCREATE TABLE文を貼るだけで、ER図をクロウズフット記法のSVGとして描き出すブラウザツール。処理はすべて手元で完結する。"
+    />
+    <meta property="og:title" content="erviz — SQLからER図SVGを生成" />
+    <meta
+      property="og:description"
+      content="DDLを貼るとER図がSVGになる。パン・ズーム・縦横切替・PNG書き出し・共有リンクに対応。"
     />
     <link rel="icon" type="image/svg+xml" href="./logo.svg" />
-    <title>erviz - SQLからER図SVGを生成</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&family=Shippori+Mincho:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <title>erviz — SQLからER図SVGを生成</title>
+    <script>
+      // 描画前にテーマを確定させてちらつきを防ぐ
+      (function () {
+        try {
+          var p = localStorage.getItem('erviz:theme');
+          if (p !== 'light' && p !== 'dark' && p !== 'system') p = 'system';
+          var dark =
+            p === 'dark' ||
+            (p === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+        } catch (e) {
+          /* ストレージ不可なら既定のlightのまま */
+        }
+      })();
+    </script>
   </head>
   <body>
-    <div class="app">
-      <header class="hero">
-        <img src="./logo.svg" width="40" height="40" alt="" aria-hidden="true" />
-        <div>
-          <h1>erviz</h1>
-          <p class="lead">DDLを貼るとER図がSVGになる</p>
-        </div>
-        <a class="repo" href="https://github.com/miruky/erviz" target="_blank" rel="noreferrer"
+    <a class="skip" href="#studio">スタジオへ移動</a>
+
+    <header class="topbar">
+      <a class="brand" href="#top" aria-label="erviz トップへ">
+        <img src="./logo.svg" width="28" height="28" alt="" aria-hidden="true" />
+        <span class="wordmark">erviz</span>
+      </a>
+      <nav class="nav" aria-label="ページ内ナビゲーション">
+        <a href="#studio">スタジオ</a>
+        <a href="#examples">例</a>
+        <a href="#how">仕組み</a>
+      </nav>
+      <div class="top-actions">
+        <button id="theme" type="button" class="ghost" aria-label="テーマを切り替える">
+          <span class="theme-icon" aria-hidden="true"></span>
+          <span id="theme-label" class="theme-label">自動</span>
+        </button>
+        <a
+          class="ghost repo"
+          href="https://github.com/miruky/erviz"
+          target="_blank"
+          rel="noreferrer"
           >GitHub</a
         >
-      </header>
+      </div>
+    </header>
 
-      <main class="panes">
-        <section class="editor" aria-label="DDL入力">
-          <div class="toolbar">
-            <button id="sample" type="button">サンプルを読み込む</button>
-            <span id="stats" class="stats" role="status"></span>
+    <main id="top">
+      <section class="hero">
+        <div class="grid-bg" aria-hidden="true"></div>
+        <div class="hero-inner">
+          <div class="hero-copy">
+            <p class="kicker">SQL DDL &rarr; ER 図</p>
+            <h1>CREATE TABLE から、<br /><em>関係</em>を描き出す。</h1>
+            <p class="lead">
+              マイグレーションや
+              <code>pg_dump</code> のDDLをそのまま貼り付けると、テーブルと外部キーを読み取って
+              ER図を組み立てる。専用記法への書き直しはいらない。図はSVGとして手元で生成され、スキーマがサーバーへ送られることはない。
+            </p>
+            <div class="hero-actions">
+              <a class="btn primary" href="#studio">スタジオを開く</a>
+              <a class="btn" href="#examples">用意した例を見る</a>
+            </div>
           </div>
-          <textarea
-            id="ddl"
-            spellcheck="false"
-            aria-label="CREATE TABLE文を入力"
-            placeholder="CREATE TABLE文を貼り付ける"
-          ></textarea>
-          <ul id="warnings" class="warnings" aria-live="polite"></ul>
-        </section>
+          <figure class="hero-figure reveal" aria-label="ER図の例">
+            <div id="hero-figure" class="figure-stage"></div>
+            <figcaption>DDLから生成したER図(クロウズフット記法)</figcaption>
+          </figure>
+        </div>
+      </section>
 
-        <section class="preview" aria-label="ER図プレビュー">
-          <div class="toolbar">
-            <button id="zoom-out" type="button" aria-label="縮小">&minus;</button>
-            <button id="zoom-in" type="button" aria-label="拡大">+</button>
-            <button id="zoom-fit" type="button">全体表示</button>
-            <span class="spacer"></span>
-            <button id="copy" type="button">SVGをコピー</button>
-            <button id="download" type="button" class="primary">SVGをダウンロード</button>
-            <span id="status" class="status" role="status"></span>
-          </div>
-          <div id="canvas" class="canvas" aria-label="ER図"></div>
-        </section>
-      </main>
-    </div>
+      <section class="studio" id="studio" aria-label="ER図スタジオ">
+        <div class="section-head">
+          <p class="kicker">スタジオ</p>
+          <h2>貼って、すぐ図にする</h2>
+        </div>
+        <div class="panes">
+          <section class="editor" aria-label="DDL入力">
+            <div class="pane-bar">
+              <span class="pane-title">DDL</span>
+              <div
+                class="example-chips"
+                id="example-chips"
+                role="group"
+                aria-label="サンプルを読み込む"
+              ></div>
+              <span class="spacer"></span>
+              <span id="stats" class="stats" role="status"></span>
+            </div>
+            <textarea
+              id="ddl"
+              spellcheck="false"
+              autocomplete="off"
+              autocapitalize="off"
+              wrap="off"
+              aria-label="CREATE TABLE文を入力"
+              placeholder="CREATE TABLE 文をここに貼り付ける"
+            ></textarea>
+            <ul id="warnings" class="warnings" aria-live="polite"></ul>
+          </section>
+
+          <section class="preview" aria-label="ER図プレビュー">
+            <div class="pane-bar">
+              <span class="pane-title">図</span>
+              <div class="zoom-group" role="group" aria-label="表示倍率">
+                <button id="zoom-out" type="button" class="icon" aria-label="縮小">&minus;</button>
+                <span id="zoom-level" class="zoom-level" aria-live="off">100%</span>
+                <button id="zoom-in" type="button" class="icon" aria-label="拡大">+</button>
+                <button id="zoom-fit" type="button" class="textbtn">全体</button>
+              </div>
+              <button id="direction" type="button" class="textbtn" aria-pressed="false">
+                縦並びにする
+              </button>
+              <span class="spacer"></span>
+              <div class="menu" role="group" aria-label="書き出し">
+                <button id="share" type="button" class="textbtn">共有リンク</button>
+                <button id="copy" type="button" class="textbtn">SVGコピー</button>
+                <button id="png" type="button" class="textbtn">PNG</button>
+                <button id="download" type="button" class="textbtn primary">SVG保存</button>
+              </div>
+            </div>
+            <div
+              id="canvas"
+              class="canvas"
+              aria-label="ER図(ドラッグで移動・ホイールで拡大縮小)"
+            ></div>
+          </section>
+        </div>
+        <p class="hint">
+          ドラッグで移動、ホイールで拡大縮小、ダブルクリックで全体表示。
+          <kbd>Ctrl</kbd>+<kbd>Enter</kbd> で全体表示、<kbd>Ctrl</kbd>+<kbd>S</kbd> でSVG保存、<kbd
+            >?</kbd
+          >
+          でショートカット一覧。
+        </p>
+      </section>
+
+      <section class="examples" id="examples" aria-label="用意したスキーマ">
+        <div class="section-head">
+          <p class="kicker">例</p>
+          <h2>そのまま試せるスキーマ</h2>
+        </div>
+        <div class="marquee" aria-hidden="true">
+          <div class="marquee-track" id="marquee-track"></div>
+        </div>
+        <ul class="gallery" id="gallery"></ul>
+      </section>
+
+      <section class="how" id="how" aria-label="仕組みと設計">
+        <div class="section-head">
+          <p class="kicker">仕組み</p>
+          <h2>DDLからSVGまで</h2>
+        </div>
+        <figure class="arch reveal">
+          <img
+            src="./architecture.svg"
+            alt="ervizの処理の流れ: DDL入力、字句解析、層状レイアウト、SVG生成"
+            loading="lazy"
+            width="960"
+            height="250"
+          />
+        </figure>
+        <div class="notes">
+          <article class="note reveal">
+            <h3>読めない文で止まらない</h3>
+            <p>
+              方言の海であるSQLを完全に解釈する道は選ばない。読めた分だけ描いて、読めなかった文は画面の警告に残す。図を出すのが目的のツールでは、エラーで何も出ないのが一番役に立たない。
+            </p>
+          </article>
+          <article class="note reveal">
+            <h3>レイアウトは決定的に</h3>
+            <p>
+              外部キーの依存から層番号を決め、同じDDLからは常に同じ図を作る。乱数も物理シミュレーションも使わないので、図をGit管理しても差分はスキーマの変更だけを映す。
+            </p>
+          </article>
+          <article class="note reveal">
+            <h3>SVGは単体で配れる形に</h3>
+            <p>
+              出力にはviewBoxとスタイルが埋め込まれ、特定のページに依存しない。リポジトリにコミットすればそのままプレビューでき、閲覧側のライト・ダークにも追従する。
+            </p>
+          </article>
+        </div>
+        <figure class="why-figure reveal">
+          <img
+            src="https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=1600&q=80"
+            alt="配線が整理されたサーバーラック"
+            loading="lazy"
+            width="1600"
+            height="900"
+          />
+          <figcaption>
+            手元のDDLが常にスキーマの正である。だから図はDDLから引き直せるべきだ、という考えで作っている。
+          </figcaption>
+        </figure>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        <a class="brand" href="#top">
+          <img src="./logo.svg" width="24" height="24" alt="" aria-hidden="true" />
+          <span class="wordmark">erviz</span>
+        </a>
+        <p class="foot-note">ブラウザ内で完結するER図ジェネレータ</p>
+        <nav class="foot-links" aria-label="フッターリンク">
+          <a href="https://github.com/miruky/erviz" target="_blank" rel="noreferrer"
+            >ソースコード</a
+          >
+          <a
+            href="https://github.com/miruky/erviz/blob/main/LICENSE"
+            target="_blank"
+            rel="noreferrer"
+            >MIT ライセンス</a
+          >
+        </nav>
+      </div>
+    </footer>
+
+    <div id="status" class="toast" role="status" aria-live="polite" hidden></div>
+
+    <dialog id="help" class="help">
+      <form method="dialog">
+        <h2>キーボードショートカット</h2>
+        <dl class="shortcuts">
+          <dt><kbd>Ctrl</kbd>+<kbd>Enter</kbd></dt>
+          <dd>全体表示にフィット</dd>
+          <dt><kbd>Ctrl</kbd>+<kbd>S</kbd></dt>
+          <dd>SVGを保存</dd>
+          <dt><kbd>D</kbd></dt>
+          <dd>縦並び・横並びを切り替え</dd>
+          <dt><kbd>?</kbd></dt>
+          <dd>このヘルプを開く</dd>
+          <dt><kbd>Esc</kbd></dt>
+          <dd>ヘルプを閉じる</dd>
+        </dl>
+        <button class="btn" value="close">閉じる</button>
+      </form>
+    </dialog>
+
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
