@@ -16,39 +16,47 @@ function esc(s: string): string {
 
 const STYLE = `
 #er {
-  --er-ink: #28323a;
+  --er-ink: #232a2e;
   --er-muted: #6b7680;
   --er-line: #8e99a3;
-  --er-panel: #ffffff;
-  --er-frame: #c3ccd4;
-  --er-hd: #eef3f2;
-  --er-accent: #0e7f74;
+  --er-panel: #fbf9f3;
+  --er-frame: #d9d2c4;
+  --er-hd: #efe9dc;
+  --er-accent: #0d7d70;
   color: var(--er-ink);
   font-family: ui-sans-serif, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
 }
 @media (prefers-color-scheme: dark) {
   #er {
-    --er-ink: #dde3e8;
-    --er-muted: #95a1ab;
+    --er-ink: #e7e3d8;
+    --er-muted: #97a1aa;
     --er-line: #717d87;
-    --er-panel: #20262b;
-    --er-frame: #3a444c;
-    --er-hd: #283439;
-    --er-accent: #4fb8a8;
+    --er-panel: #1d2226;
+    --er-frame: #38424a;
+    --er-hd: #262f34;
+    --er-accent: #4fbcac;
   }
 }
-#er .tbl .frame { fill: var(--er-panel); stroke: var(--er-frame); stroke-width: 1.25; }
+#er .tbl .frame { fill: var(--er-panel); stroke: var(--er-frame); stroke-width: 1.25; transition: stroke .15s ease; }
 #er .tbl .hd { fill: var(--er-hd); }
 #er .tbl .tname { font-size: 14px; font-weight: 700; fill: var(--er-ink); }
 #er .tbl .cname { font-size: 13px; fill: var(--er-ink); }
 #er .tbl .ctype { font-size: 12px; fill: var(--er-muted); }
 #er .tbl .ic { stroke: var(--er-accent); stroke-width: 1.5; fill: none; }
-#er .edge .line { stroke: var(--er-line); stroke-width: 1.5; fill: none; }
-#er .edge .mark { stroke: var(--er-line); stroke-width: 1.5; fill: none; }
+#er .tbl:hover .frame { stroke: var(--er-accent); }
+#er .edge .line { stroke: var(--er-line); stroke-width: 1.5; fill: none; transition: stroke .15s ease; }
+#er .edge .mark { stroke: var(--er-line); stroke-width: 1.5; fill: none; transition: stroke .15s ease; }
 #er .edge .hit { stroke: transparent; stroke-width: 14; fill: none; }
 #er .edge:hover .line, #er .edge:hover .mark { stroke: var(--er-accent); }
 #er .empty { font-size: 14px; fill: var(--er-muted); }
 `;
+
+interface Vec {
+  ox: number;
+  oy: number;
+  px: number;
+  py: number;
+}
 
 function keyIcon(x: number, y: number): string {
   return (
@@ -72,7 +80,9 @@ function tableSvg(box: Box): string {
   const t = box.table;
   const w = box.width;
   const parts: string[] = [];
-  parts.push(`<g class="tbl" transform="translate(${box.x},${box.y})">`);
+  parts.push(
+    `<g class="tbl" data-table="${esc(t.name)}" transform="translate(${box.x},${box.y})">`,
+  );
   parts.push(`<title>${esc(t.name)}</title>`);
   parts.push(`<rect class="frame" width="${w}" height="${box.height}" rx="9"/>`);
   parts.push(
@@ -104,62 +114,119 @@ function rowY(box: Box, table: Table, colName: string | undefined): number {
   return box.y + HEADER_H / 2;
 }
 
-/** 多側の端点。dir はボックスから外へ向かう向き(+1: 右、-1: 左) */
-function manyMark(x: number, y: number, dir: number, mandatory: boolean): string {
-  const tip = x + 13 * dir;
-  const foot = `M${x} ${y - 5}L${tip} ${y}M${x} ${y + 5}L${tip} ${y}`;
+/** 多側の端点(クロウズフット)。v は外向き・直交の単位ベクトル */
+function manyMark(x: number, y: number, v: Vec, mandatory: boolean): string {
+  const tx = x + v.ox * 13;
+  const ty = y + v.oy * 13;
+  const foot =
+    `M${x + v.px * 5} ${y + v.py * 5}L${tx} ${ty}` + `M${x - v.px * 5} ${y - v.py * 5}L${tx} ${ty}`;
   const opt = mandatory
-    ? `M${x + 17 * dir} ${y - 5}v10`
-    : `M${x + 20 * dir} ${y}a3.2 3.2 0 1 0 ${-6.4 * dir} 0a3.2 3.2 0 1 0 ${6.4 * dir} 0`;
+    ? `M${x + v.ox * 17 + v.px * 5} ${y + v.oy * 17 + v.py * 5}` +
+      `L${x + v.ox * 17 - v.px * 5} ${y + v.oy * 17 - v.py * 5}`
+    : `M${x + v.ox * 20 + 3.2} ${y + v.oy * 20}a3.2 3.2 0 1 0 -6.4 0a3.2 3.2 0 1 0 6.4 0`;
   return `<path class="mark" d="${foot}${opt}"/>`;
 }
 
-/** 1側の端点(垂直バー) */
-function oneMark(x: number, y: number, dir: number): string {
-  return `<path class="mark" d="M${x + 11 * dir} ${y - 5}v10"/>`;
+/** 1側の端点(直交バー) */
+function oneMark(x: number, y: number, v: Vec): string {
+  const cx = x + v.ox * 11;
+  const cy = y + v.oy * 11;
+  return `<path class="mark" d="M${cx + v.px * 5} ${cy + v.py * 5}L${cx - v.px * 5} ${cy - v.py * 5}"/>`;
 }
 
-function edgeSvg(rel: Relation, from: Box, to: Box): string {
+const HX = (dir: number): Vec => ({ ox: dir, oy: 0, px: 0, py: 1 });
+const VY = (dir: number): Vec => ({ ox: 0, oy: dir, px: 1, py: 0 });
+
+interface Endpoints {
+  d: string;
+  x1: number;
+  y1: number;
+  v1: Vec;
+  x2: number;
+  y2: number;
+  v2: Vec;
+}
+
+function routeLR(rel: Relation, from: Box, to: Box): Endpoints {
   const y1 = rowY(from, from.table, rel.fromColumns[0]);
   let y2 = rowY(to, to.table, rel.toColumns[0]);
-  let d: string;
-  let dir1: number;
-  let dir2: number;
-  let x1: number;
-  let x2: number;
-
   if (from.x + from.width + 24 <= to.x) {
-    x1 = from.x + from.width;
-    x2 = to.x;
-    dir1 = 1;
-    dir2 = -1;
+    const x1 = from.x + from.width;
+    const x2 = to.x;
     const mx = Math.round((x1 + x2) / 2);
-    d = `M${x1} ${y1}H${mx}V${y2}H${x2}`;
-  } else if (to.x + to.width + 24 <= from.x) {
-    x1 = from.x;
-    x2 = to.x + to.width;
-    dir1 = -1;
-    dir2 = 1;
-    const mx = Math.round((x1 + x2) / 2);
-    d = `M${x1} ${y1}H${mx}V${y2}H${x2}`;
-  } else {
-    // 同じ列・自己参照は右側に迂回する
-    x1 = from.x + from.width;
-    x2 = to.x + to.width;
-    dir1 = 1;
-    dir2 = 1;
-    if (from === to && y1 === y2) y2 = y1 + ROW_H / 2 > from.y + from.height ? y1 - 10 : y1 + 10;
-    const out = Math.max(x1, x2) + 44;
-    d = `M${x1} ${y1}H${out}V${y2}H${x2}`;
+    return { d: `M${x1} ${y1}H${mx}V${y2}H${x2}`, x1, y1, v1: HX(1), x2, y2, v2: HX(-1) };
   }
+  if (to.x + to.width + 24 <= from.x) {
+    const x1 = from.x;
+    const x2 = to.x + to.width;
+    const mx = Math.round((x1 + x2) / 2);
+    return { d: `M${x1} ${y1}H${mx}V${y2}H${x2}`, x1, y1, v1: HX(-1), x2, y2, v2: HX(1) };
+  }
+  // 同じ列・自己参照は右側に迂回する
+  const x1 = from.x + from.width;
+  const x2 = to.x + to.width;
+  if (from === to && y1 === y2) y2 = y1 + ROW_H / 2 > from.y + from.height ? y1 - 10 : y1 + 10;
+  const out = Math.max(x1, x2) + 44;
+  return { d: `M${x1} ${y1}H${out}V${y2}H${x2}`, x1, y1, v1: HX(1), x2, y2, v2: HX(1) };
+}
 
+function routeTB(from: Box, to: Box): Endpoints {
+  const cxFrom = from.x + from.width / 2;
+  const cxTo = to.x + to.width / 2;
+  if (to.y + to.height + 24 <= from.y) {
+    const y1 = from.y;
+    const y2 = to.y + to.height;
+    const my = Math.round((y1 + y2) / 2);
+    return {
+      d: `M${cxFrom} ${y1}V${my}H${cxTo}V${y2}`,
+      x1: cxFrom,
+      y1,
+      v1: VY(-1),
+      x2: cxTo,
+      y2,
+      v2: VY(1),
+    };
+  }
+  if (from.y + from.height + 24 <= to.y) {
+    const y1 = from.y + from.height;
+    const y2 = to.y;
+    const my = Math.round((y1 + y2) / 2);
+    return {
+      d: `M${cxFrom} ${y1}V${my}H${cxTo}V${y2}`,
+      x1: cxFrom,
+      y1,
+      v1: VY(1),
+      x2: cxTo,
+      y2,
+      v2: VY(-1),
+    };
+  }
+  // 同層・自己参照は下側に迂回する
+  const y1 = from.y + from.height;
+  let y2 = to.y + to.height;
+  if (from === to) y2 = to.y;
+  const out = Math.max(y1, y2) + 44;
+  const x2 = from === to ? cxTo + 18 : cxTo;
+  return {
+    d: `M${cxFrom} ${y1}V${out}H${x2}V${y2}`,
+    x1: cxFrom,
+    y1,
+    v1: VY(1),
+    x2,
+    y2,
+    v2: from === to ? VY(-1) : VY(1),
+  };
+}
+
+function edgeSvg(rel: Relation, from: Box, to: Box, dir: Layout['direction']): string {
+  const e = dir === 'TB' ? routeTB(from, to) : routeLR(rel, from, to);
   const label = `${rel.fromTable}.${rel.fromColumns.join(',')} から ${rel.toTable}.${rel.toColumns.join(',')} への参照`;
   return (
-    `<g class="edge"><title>${esc(label)}</title>` +
-    `<path class="hit" d="${d}"/>` +
-    `<path class="line" d="${d}"/>` +
-    (rel.one ? oneMark(x1, y1, dir1) : manyMark(x1, y1, dir1, rel.mandatory)) +
-    oneMark(x2, y2, dir2) +
+    `<g class="edge" data-from="${esc(rel.fromTable)}" data-to="${esc(rel.toTable)}"><title>${esc(label)}</title>` +
+    `<path class="hit" d="${e.d}"/>` +
+    `<path class="line" d="${e.d}"/>` +
+    (rel.one ? oneMark(e.x1, e.y1, e.v1) : manyMark(e.x1, e.y1, e.v1, rel.mandatory)) +
+    oneMark(e.x2, e.y2, e.v2) +
     '</g>'
   );
 }
@@ -181,7 +248,7 @@ export function renderSvg(layout: Layout, schema: Schema): string {
     const from = byName.get(rel.fromTable.toLowerCase());
     const to = byName.get(rel.toTable.toLowerCase());
     if (from === undefined || to === undefined) continue;
-    edges.push(edgeSvg(rel, from, to));
+    edges.push(edgeSvg(rel, from, to, layout.direction));
   }
 
   const tables = layout.boxes.map((b) => tableSvg(b));

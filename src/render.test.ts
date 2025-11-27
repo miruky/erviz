@@ -72,6 +72,27 @@ describe('renderSvg', () => {
     expect(svg).toContain('CREATE TABLE文が見つかりません');
     expect(svg).toContain('viewBox');
   });
+
+  it('テーブルと参照に走査用のdata属性を付ける', () => {
+    const svg = svgFor(`
+      CREATE TABLE users (id INT PRIMARY KEY);
+      CREATE TABLE orders (id INT PRIMARY KEY, user_id INT REFERENCES users(id));
+    `);
+    expect(svg).toContain('data-table="orders"');
+    expect(svg).toContain('data-from="orders"');
+    expect(svg).toContain('data-to="users"');
+  });
+
+  it('縦向きレイアウトでも妥当なSVGを返す', () => {
+    const schema = parseSchema(`
+      CREATE TABLE users (id INT PRIMARY KEY);
+      CREATE TABLE orders (id INT PRIMARY KEY, user_id INT REFERENCES users(id));
+    `);
+    const svg = renderSvg(layoutSchema(schema, { direction: 'TB' }), schema);
+    expect(svg).toMatch(/^<svg /);
+    expect(svg).toContain('class="edge"');
+    expect(svg).toContain('</svg>');
+  });
 });
 
 describe('ddlToSvg', () => {
@@ -80,5 +101,10 @@ describe('ddlToSvg', () => {
     expect(svg).toContain('>order_items</text>');
     expect(svg).toContain('>reviews</text>');
     expect(svg.match(/class="edge"/g)?.length).toBe(8);
+  });
+
+  it('オプションでレイアウト向きを指定できる', () => {
+    const svg = ddlToSvg('CREATE TABLE t (id INT PRIMARY KEY);', { direction: 'TB' });
+    expect(svg).toContain('<svg');
   });
 });
