@@ -83,6 +83,14 @@ describe('renderSvg', () => {
     expect(svg).toContain('data-to="users"');
   });
 
+  it('参照アクションを関係線のtitleに含める', () => {
+    const svg = svgFor(`
+      CREATE TABLE users (id INT PRIMARY KEY);
+      CREATE TABLE orders (id INT PRIMARY KEY, user_id INT REFERENCES users(id) ON DELETE CASCADE);
+    `);
+    expect(svg).toContain('ON DELETE CASCADE');
+  });
+
   it('縦向きレイアウトでも妥当なSVGを返す', () => {
     const schema = parseSchema(`
       CREATE TABLE users (id INT PRIMARY KEY);
