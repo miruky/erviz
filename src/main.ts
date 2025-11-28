@@ -387,6 +387,7 @@ const SYNTAX = [
   'CREATE TABLE',
   'FOREIGN KEY',
   'REFERENCES',
+  'ON DELETE CASCADE',
   'PRIMARY KEY',
   'UNIQUE',
   'ALTER TABLE',
@@ -431,6 +432,39 @@ document.addEventListener('keydown', (e) => {
     toast('SVGを保存しました');
     return;
   }
+  // フォーカス中の図はキーボードでも操作できる
+  if (document.activeElement === canvas) {
+    const step = 48;
+    const pan: Record<string, [number, number]> = {
+      ArrowLeft: [step, 0],
+      ArrowRight: [-step, 0],
+      ArrowUp: [0, step],
+      ArrowDown: [0, -step],
+    };
+    const move = pan[e.key];
+    if (move !== undefined) {
+      view.x += move[0];
+      view.y += move[1];
+      applyView();
+      e.preventDefault();
+      return;
+    }
+    if (e.key === '+' || e.key === '=') {
+      zoomBy(1.2);
+      e.preventDefault();
+      return;
+    }
+    if (e.key === '-' || e.key === '_') {
+      zoomBy(0.83);
+      e.preventDefault();
+      return;
+    }
+    if (e.key === '0') {
+      fit();
+      e.preventDefault();
+      return;
+    }
+  }
   const typing = document.activeElement === ddl;
   if (typing) return;
   if (e.key === '?' || (e.shiftKey && e.key === '/')) {
@@ -451,6 +485,30 @@ function setupMotion(): void {
     start: 'top 86%',
     onEnter: (els) =>
       gsap.to(els, { opacity: 1, y: 0, duration: 0.7, stagger: 0.12, ease: 'power3.out' }),
+  });
+}
+
+/* ---- スクロールに応じてナビを強調 ---- */
+function setupActiveNav(): void {
+  const links = new Map<string, HTMLAnchorElement>();
+  document.querySelectorAll<HTMLAnchorElement>('.nav a').forEach((a) => {
+    const id = a.getAttribute('href')?.slice(1);
+    if (id !== undefined) links.set(id, a);
+  });
+  const observer = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          links.forEach((a) => a.classList.remove('active'));
+          links.get(entry.target.id)?.classList.add('active');
+        }
+      }
+    },
+    { rootMargin: '-45% 0px -50% 0px' },
+  );
+  ['studio', 'examples', 'how'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el !== null) observer.observe(el);
   });
 }
 
@@ -481,6 +539,7 @@ dirBtn.setAttribute('aria-pressed', direction === 'TB' ? 'true' : 'false');
 render(true);
 window.addEventListener('resize', () => fit());
 setupMotion();
+setupActiveNav();
 
 if (readShareHash(location.hash) !== null) {
   byId('studio').scrollIntoView({ behavior: 'auto' });

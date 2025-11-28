@@ -64,6 +64,7 @@ CREATE TABLE orders (
 | 列定義のインライン `REFERENCES t(col)`        | 外部キー                           |
 | 表レベルの `FOREIGN KEY (a) REFERENCES t (b)` | 外部キー(複合キー対応)             |
 | `ALTER TABLE ... ADD CONSTRAINT ...`          | 外部キー・主キー・UNIQUEの後付け   |
+| `ON DELETE` / `ON UPDATE` の参照アクション    | 関係線のツールチップに表示         |
 | `PRIMARY KEY (a, b)` / `UNIQUE (a)`           | キー表示と多重度判定に反映         |
 | `` `x` `` / `"x"` / `[x]` / `schema.x`        | 引用・修飾識別子                   |
 | `--` / `/* */` コメント                       | 読み飛ばし(文字列リテラル内は保持) |
